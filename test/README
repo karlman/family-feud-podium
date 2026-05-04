@@ -1,0 +1,7 @@
+This directory is intended for PIO Test Runner and project tests.
+
+Unit Testing is a software testing method by which individual units
+of source code, sets of one or more microcomputer programs, logic and
+procedure: are tested to determine whether they are fit for use.
+More information about PIO Test Runner
+- https://docs.platformio.org/en/latest/advanced/unit-testing/index.html

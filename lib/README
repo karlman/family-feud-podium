@@ -1,0 +1,12 @@
+This directory is intended for project specific (private) libraries.
+PlatformIO will compile them to static libraries and link into executable file.
+
+The source code of each library should be placed in an own separate directory
+("lib/your_library_name/src" folder) or a single file if the library is small.
+
+PlatformIO will find the lib_extra_dirs variable in the top-level
+platformio.ini file, using the `lib_extra_dirs` option to specify additional
+locations for project-specific (private) libraries.
+
+More information about PlatformIO Library Dependency Finder
+- https://docs.platformio.org/page/librarymanager/ldf.html

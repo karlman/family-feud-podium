@@ -1,0 +1,22 @@
+This directory is intended for project header files.
+
+A header file is a file containing C declarations and macro definitions
+to be shared between several project source files. You request to use a header
+file in your source file (C, C++, etc) located in src folder by including it,
+with the following include syntax:
+
+#include "../include/header.h"
+
+Including a header file produces the same results as copying the header file
+into each source file that needs it. Such copying would be time-consuming
+and error-prone. With a header file, the related declarations appear
+in only one place. If they need to be changed, they can be changed in one
+place, and programs that include the header file will automatically use the
+new version when next recompiled. The header file eliminates the labor of
+finding and changing all the copies as well as the risk that a copy will
+be missed.
+
+In C, the usual convention is to give header files a .h extension. Declarations
+in header files should be protected against multiple inclusions with include guards
+in C: the #ifndef and #define preprocessor directives. See the example header file
+in src/SPI.h.
