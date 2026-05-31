@@ -55,4 +55,5 @@ void setMosfets(int podium, uint8_t val);
 void setAllMosfets(uint8_t val);
 void fillStrip(Adafruit_NeoPixel& s, uint32_t color);
 void flashStrikeX(Adafruit_NeoPixel& s);
+void drawPersistentStrikes(Adafruit_NeoPixel& s, int strikes);
 void doStartupSequence();

@@ -7,8 +7,9 @@ Adafruit_NeoPixel strip1(STRIP_NUM_LEDS, P1_STRIP, NEO_RGB + NEO_KHZ800);
 Adafruit_NeoPixel strip2(STRIP_NUM_LEDS, P2_STRIP, NEO_RGB + NEO_KHZ800);
 
 // ── State ─────────────────────────────────────────────────────────────────────
-static GameState gameState     = GS_CLEAR;
-static bool      buzzinEnabled = false;
+static GameState gameState       = GS_CLEAR;
+static bool      buzzinEnabled   = false;
+static int       persistentStrikes = 0;   // accumulated strikes, shown on active matrix
 
 // ── Serial command buffer ─────────────────────────────────────────────────────
 static char    cmdBuf[64];
@@ -113,26 +114,54 @@ void loop() {
   }
 }
 
+// ── Draw accumulated strike Xs on a strip (background pixels left dark) ──────
+// Pattern per 3-row section (6 cols), 1-row gap between strikes:
+//   row 0: X X . . X X   (cols 0,1,4,5)
+//   row 1: . . X X . .   (cols 2,3)
+//   row 2: X X . . X X   (cols 0,1,4,5)
+void drawPersistentStrikes(Adafruit_NeoPixel& s, int strikes) {
+  s.clear();
+  const uint8_t outerCols[] = {0, 1, 4, 5};
+  const uint8_t innerCols[] = {2, 3};
+  for (int st = 0; st < strikes && st < 3; st++) {
+    int r = st * 4;
+    for (uint8_t i = 0; i < 4; i++) {
+      s.setPixelColor(serpIdx(outerCols[i], r + 0), CLR_RED);
+      s.setPixelColor(serpIdx(outerCols[i], r + 2), CLR_RED);
+    }
+    s.setPixelColor(serpIdx(innerCols[0], r + 1), CLR_RED);
+    s.setPixelColor(serpIdx(innerCols[1], r + 1), CLR_RED);
+  }
+  s.show();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 void processCommand(const char* cmd) {
   if (strcmp(cmd, "RESET") == 0) {
-    gameState     = GS_RESET;
-    buzzinEnabled = false;
+    gameState          = GS_RESET;
+    buzzinEnabled      = false;
+    persistentStrikes  = 0;
     fillStrip(strip1, CLR_ROYAL_BLUE);
     fillStrip(strip2, CLR_ROYAL_BLUE);
     setAllMosfets(0);
 
   } else if (strcmp(cmd, "BUZZIN") == 0) {
-    gameState       = GS_BUZZIN;
-    buzzinEnabled   = true;
-    pulseBrightness = 30;
-    pulseDelta      = 5;
-    animTimer       = millis();
+    gameState          = GS_BUZZIN;
+    buzzinEnabled      = true;
+    persistentStrikes  = 0;
+    pulseBrightness    = 30;
+    pulseDelta         = 5;
+    animTimer          = millis();
+    setAllMosfets(0);
 
   } else if (strcmp(cmd, "ACTIVE:1") == 0) {
     gameState     = GS_ACTIVE_1;
     buzzinEnabled = false;
-    fillStrip(strip1, CLR_WHITE);
+    if (persistentStrikes > 0) {
+      drawPersistentStrikes(strip1, persistentStrikes);
+    } else {
+      fillStrip(strip1, CLR_WHITE);
+    }
     fillStrip(strip2, CLR_DIM_BLUE);
     setMosfets(1, 255);
     setMosfets(2, 60);
@@ -140,12 +169,17 @@ void processCommand(const char* cmd) {
   } else if (strcmp(cmd, "ACTIVE:2") == 0) {
     gameState     = GS_ACTIVE_2;
     buzzinEnabled = false;
-    fillStrip(strip2, CLR_WHITE);
+    if (persistentStrikes > 0) {
+      drawPersistentStrikes(strip2, persistentStrikes);
+    } else {
+      fillStrip(strip2, CLR_WHITE);
+    }
     fillStrip(strip1, CLR_DIM_BLUE);
     setMosfets(2, 255);
     setMosfets(1, 60);
 
   } else if (strncmp(cmd, "STRIKE:", 7) == 0) {
+    persistentStrikes = atoi(cmd + 7);
     // Flash red X on both strips; Pi will follow with ACTIVE: to restore state
     flashStrikeX(strip1);
     flashStrikeX(strip2);
@@ -166,8 +200,9 @@ void processCommand(const char* cmd) {
     animTimer = millis();
 
   } else if (strcmp(cmd, "CLEAR") == 0) {
-    gameState     = GS_CLEAR;
-    buzzinEnabled = false;
+    gameState         = GS_CLEAR;
+    buzzinEnabled     = false;
+    persistentStrikes = 0;
     fillStrip(strip1, CLR_OFF);
     fillStrip(strip2, CLR_OFF);
     setAllMosfets(0);
@@ -197,21 +232,24 @@ void fillStrip(Adafruit_NeoPixel& s, uint32_t color) {
   s.show();
 }
 
-// ── X pattern drawn across the 6×12 serpentine grid ──────────────────────────
+// ── Bold X flash — matches virtual podium pattern ─────────────────────────────
+// rows 0-2 & 9-11: ##..##  (cols 0,1,4,5)
+// rows 3-4 & 7-8:  .####.  (cols 1,2,3,4)
+// rows 5-6:        ..##..  (cols 2,3)
 void flashStrikeX(Adafruit_NeoPixel& s) {
   s.clear();
+  static const uint8_t WIDE[] = {0, 1, 4, 5};
+  static const uint8_t MID[]  = {1, 2, 3, 4};
+  static const uint8_t CEN[]  = {2, 3};
+
   for (int row = 0; row < STRIP_ROWS; row++) {
-    int colA = (row * (STRIP_COLS - 1)) / (STRIP_ROWS - 1);
-    int colB = (STRIP_COLS - 1) - colA;
-
-    s.setPixelColor(serpIdx(colA, row), CLR_RED);
-    s.setPixelColor(serpIdx(colB, row), CLR_RED);
-
-    // Thicken diagonals by one pixel
-    if (colA > 0)              s.setPixelColor(serpIdx(colA - 1, row), 0x660000);
-    if (colA < STRIP_COLS - 1) s.setPixelColor(serpIdx(colA + 1, row), 0x660000);
-    if (colB > 0)              s.setPixelColor(serpIdx(colB - 1, row), 0x660000);
-    if (colB < STRIP_COLS - 1) s.setPixelColor(serpIdx(colB + 1, row), 0x660000);
+    const uint8_t* cols;
+    uint8_t len;
+    if (row <= 2 || row >= 9)          { cols = WIDE; len = 4; }
+    else if (row == 5 || row == 6)     { cols = CEN;  len = 2; }
+    else                               { cols = MID;  len = 4; }
+    for (uint8_t i = 0; i < len; i++)
+      s.setPixelColor(serpIdx(cols[i], row), CLR_RED);
   }
   s.show();
 }
